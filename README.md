@@ -102,3 +102,40 @@ When deploying, we got:
     }
 }
 ```
+
+```yaml
+{
+    "output": "2022-02-11T15:22:50.024471562+0000: Notice A shell was spawned in a container with an attached terminal (user=root user_loginuid=-1 k8s.ns=default k8s.pod=falco-lrfjl container=8b42665ac049 shell=sh parent=runc cmdline=sh terminal=34816 container_id=8b42665ac049 image=falcosecurity/falco) k8s.ns=default k8s.pod=falco-lrfjl container=8b42665ac049",
+    "priority": "Notice",
+    "rule": "Terminal shell in container",
+    "source": "syscall",
+    "tags": [
+        "container",
+        "mitre_execution",
+        "shell"
+    ],
+    "time": "2022-02-11T15:22:50.024471562Z",
+    "output_fields": {
+        "container.id": "8b42665ac049",
+        "container.image.repository": "falcosecurity/falco",
+        "evt.time.iso8601": 1644592970024471562,
+        "k8s.ns.name": "default",
+        "k8s.pod.name": "falco-lrfjl",
+        "proc.cmdline": "sh",
+        "proc.name": "sh",
+        "proc.pname": "runc",
+        "proc.tty": 34816,
+        "user.loginuid": -1,
+        "user.name": "root"
+    }
+}
+```
+
+### Adding k8s logs
+
+Falco can also read up the k8s logs as they come and derive alerts from it based on the same querying language.
+The requirement for this to work is to get a webhook to post k8s logs as they come into the falco pod. Its webserver needs to be enabled.
+
+[k8s audit logs for falco](https://github.com/falcosecurity/charts/tree/master/falco#enabling-k8s-audit-event-support)
+[EKS Cloudwatch](https://github.com/sysdiglabs/ekscloudwatch)
+[EKS logs into falco blog](https://faun.pub/analyze-aws-eks-audit-logs-with-falco-95202167f2e)

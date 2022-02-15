@@ -2,3 +2,5 @@
 falco:
   timeFormatISO8601: true
   jsonOutput: true
+auditLog:
+  enabled: true
