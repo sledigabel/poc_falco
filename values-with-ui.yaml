@@ -6,3 +6,9 @@ falco:
     nodePort: 32765
 auditLog:
   enabled: true
+falcosidekick:
+  enabled: true
+  webui:
+    enabled: true
+    service:
+      type: NodePort

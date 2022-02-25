@@ -1,9 +1,12 @@
+
 # poc_falco
+
 This repository is containing a proof of concept on falco for k8s
 
 ## Setup
 
 First, setup minikube
+
 ```bash
 minikube start --profile falco --driver hyperkit --cpus 4 --memory 8GiB
 ```
@@ -21,7 +24,8 @@ Then install the chart:
 helm install falco falcosecurity/falco
 ```
 
-Immediately we see a notice for falco to start (it detects itself as a privileged container):
+We see a notice for falco to start (it detects itself as a privileged container):
+
 ```console
 * Setting up /usr/src links from host
 * Running falco-driver-loader for: falco version=0.31.0, driver version=319368f1ad778691164d33d59945e00c5752cd27
@@ -67,6 +71,7 @@ I tried to create a dummy file in `/etc` as root and launch a privileged contain
 ### JSON output
 
 The output can be JSON
+
 ```yaml
 ---
 falco:
@@ -134,8 +139,77 @@ When deploying, we got:
 ### Adding k8s logs
 
 Falco can also read up the k8s logs as they come and derive alerts from it based on the same querying language.
-The requirement for this to work is to get a webhook to post k8s logs as they come into the falco pod. Its webserver needs to be enabled.
+For this to work, we need k8s to post logs as a webhook as they come into the falco pod. We need to enable the webserver to receive those webhooks.
 
 [k8s audit logs for falco](https://github.com/falcosecurity/charts/tree/master/falco#enabling-k8s-audit-event-support)
 [EKS Cloudwatch](https://github.com/sysdiglabs/ekscloudwatch)
 [EKS logs into falco blog](https://faun.pub/analyze-aws-eks-audit-logs-with-falco-95202167f2e)
+
+#### On Minikube
+
+Following the [Guide](https://github.com/falcosecurity/evolution/tree/master/examples/k8s_audit_config#instructions-for-kubernetes-113) is failing.
+That is because DynamicAuditing is deprecated since 1.19.
+
+References:
+- [FeatureGates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/)
+- Kube 1.19 [release notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.19.md)
+- The [dynamic audit PR](https://github.com/kubernetes/kubernetes/pull/91502)
+
+The idea is to configure the api server with a webhook statically.
+
+```bash
+minikube start --cpus 4 --memory 8GiB
+helm install falco --values values.yaml falcosecurity/falco
+git clone git@github.com:falcosecurity/evolution.git
+pushd ./evolution/examples/k8s_audit_config
+FALCO_SERVICE_CLUSTERIP=$(kubectl get service falco -o=jsonpath={.spec.clusterIP}) envsubst < webhook-config.yaml.in > webhook-config.yaml
+bash enable-k8s-audit.sh minikube static
+popd
+```
+
+This will reconfigure the api server on minikube, and it will take a while to restart.
+The api-server's logs are reporting how many webhooks it has sent.
+
+```console
+{"log":"Trace[628419535]: [1.052845699s] [1.052845699s] END\n","stream":"stderr","time":"2022-02-15T13:59:42.411888879Z"}
+{"log":"I0215 13:59:44.329471       1 trace.go:205] Trace[787090352]: \"Call Audit Events webhook\" name:webhook,event-count:12 (15-Feb-2022 13:59:43.301) (total time: 1027ms):\n","stream":"stderr","time":"2022-02-15T13:59:44.32976007Z"}
+{"log":"Trace[787090352]: [1.027556675s] [1.027556675s] END\n","stream":"stderr","time":"2022-02-15T13:59:44.329791793Z"}
+{"log":"I0215 13:59:44.521736       1 trace.go:205] Trace[1925773888]: \"Call Audit Events webhook\" name:webhook,event-count:13 (15-Feb-2022 13:59:43.497) (total time: 1024ms):\n","stream":"stderr","time":"2022-02-15T13:59:44.522390011Z"}
+{"log":"Trace[1925773888]: [1.024471619s] [1.024471619s] END\n","stream":"stderr","time":"2022-02-15T13:59:44.522435607Z"}
+{"log":"I0215 13:59:44.777424       1 trace.go:205] Trace[770366437]: \"Call Audit Events webhook\" name:webhook,event-count:7 (15-Feb-2022 13:59:43.731) (total time: 1046ms):\n","stream":"stderr","time":"2022-02-15T13:59:44.778251891Z"}
+{"log":"Trace[770366437]: [1.046283543s] [1.046283543s] END\n","stream":"stderr","time":"2022-02-15T13:59:44.778291065Z"}
+{"log":"I0215 13:59:44.777786       1 trace.go:205] Trace[214580956]: \"Call Audit Events webhook\" name:webhook,event-count:8 (15-Feb-2022 13:59:43.730) (total time: 1046ms):\n","stream":"stderr","time":"2022-02-15T13:59:44.778297715Z"}
+{"log":"Trace[214580956]: [1.046759217s] [1.046759217s] END\n","stream":"stderr","time":"2022-02-15T13:59:44.7783034Z"}
+{"log":"I0215 13:59:46.200055       1 trace.go:205] Trace[2043264468]: \"Call Audit Events webhook\" name:webhook,event-count:14 (15-Feb-2022 13:59:45.121) (total time: 1078ms):\n","stream":"stderr","time":"2022-02-15T13:59:46.200387099Z"}
+{"log":"Trace[2043264468]: [1.078563449s] [1.078563449s] END\n","stream":"stderr","time":"2022-02-15T13:59:46.200412563Z"}
+```
+
+and we see new messages popping up:
+
+```console
+{"output":"2022-02-15T14:03:12.123639040+0000: Warning Request by anonymous user allowed (user=system:anonymous verb=get uri=/readyz reason=RBAC: allowed by ClusterRoleBinding \"system:public-info-viewer\" of ClusterRole \"system:public-info-viewer\" to Group \"system:unauthenticated\"))","priority":"Warning","rule":"Anonymous Request Allowed","source":"k8s_audit","tags":["k8s"],"time":"2022-02-15T14:03:12.123639040Z", "output_fields": {"jevt.time.iso8601":"2022-02-15T14:03:12.123639040+0000","ka.auth.reason":"RBAC: allowed by ClusterRoleBinding \"system:public-info-viewer\" of ClusterRole \"system:public-info-viewer\" to Group \"system:unauthenticated\"","ka.uri":"/readyz","ka.user.name":"system:anonymous","ka.verb":"get"}}
+{"output":"2022-02-15T14:03:15.122832896+0000: Warning Request by anonymous user allowed (user=system:anonymous verb=get uri=/livez reason=RBAC: allowed by ClusterRoleBinding \"system:public-info-viewer\" of ClusterRole \"system:public-info-viewer\" to Group \"system:unauthenticated\"))","priority":"Warning","rule":"Anonymous Request Allowed","source":"k8s_audit","tags":["k8s"],"time":"2022-02-15T14:03:15.122832896Z", "output_fields": {"jevt.time.iso8601":"2022-02-15T14:03:15.122832896+0000","ka.auth.reason":"RBAC: allowed by ClusterRoleBinding \"system:public-info-viewer\" of ClusterRole \"system:public-info-viewer\" to Group \"system:unauthenticated\"","ka.uri":"/livez","ka.user.name":"system:anonymous","ka.verb":"get"}}
+```
+
+This is from [this rule](https://github.com/falcosecurity/charts/blob/master/falco/rules/k8s_audit_rules.yaml#L208) which confirms that the k8s audit works!
+Those endpoinds are receiving some "anonymous" queries frequently; not sure why but this is interesting. Are they requested every second?
+
+Found [this OpenShift link](http://static.open-scap.org/ssg-guides/ssg-ocp4-guide-cis.html) briefly mentioning the rule and this [issue](https://github.com/falcosecurity/falco/issues/1794) from falco which suggests we should remove those two endpoinds as they are meant to be public anyway.
+
+
+## With the UI
+
+
+```bash
+./bootstrap_with_falcoui.sh ./values-with-ui.yaml
+```
+
+This will add falcosidekick that can send the alerts but also run a simple UI to visualise the alerts as they come in.
+
+## Fake event generation
+
+The falco chart also allows a fake generation in order to test the end to end process.
+
+```bash
+./bootstrap_with_falcoui.sh ./values-with-ui-and-fakegenerator.yaml
+```

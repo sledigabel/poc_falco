@@ -1,0 +1,20 @@
+---
+fakeEventGenerator:
+  enabled: true
+  args:
+    - "run"
+    - "--loop"
+    - "--all"
+falco:
+  timeFormatISO8601: true
+  jsonOutput: true
+  webserver:
+    nodePort: 32765
+auditLog:
+  enabled: true
+falcosidekick:
+  enabled: true
+  webui:
+    enabled: true
+    service:
+      type: NodePort
