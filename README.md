@@ -201,7 +201,7 @@ Found [this OpenShift link](http://static.open-scap.org/ssg-guides/ssg-ocp4-guid
 
 
 ```bash
-./bootstrap_with_falcoui.sh ./values-with-ui.yaml
+./bootstrap.sh ./values-with-ui.yaml
 ```
 
 This will add falcosidekick that can send the alerts but also run a simple UI to visualise the alerts as they come in.
@@ -211,5 +211,5 @@ This will add falcosidekick that can send the alerts but also run a simple UI to
 The falco chart also allows a fake generation in order to test the end to end process.
 
 ```bash
-./bootstrap_with_falcoui.sh ./values-with-ui-and-fakegenerator.yaml
+./bootstrap.sh ./values-with-ui-and-fakegenerator.yaml
 ```
